@@ -1,0 +1,57 @@
+# Compiled output
+/target/
+/out/
+/build/
+/bin/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Logs
+*.log
+logs/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Application properties (含密码等敏感信息)
+application-prod.properties
+application-prod.yml
+.env
+*.secret
+
+# Node
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.venv/
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Test
+coverage/
+.nyc_output/
+
+# Temp
+*.tmp
+*.swp
+*.swo
+*~
