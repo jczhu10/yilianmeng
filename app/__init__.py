@@ -8,7 +8,7 @@ import sys
 
 load_dotenv()
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -28,3 +28,15 @@ migrate = Migrate(app, db)
 
 from app.models import User, Profile, Work, Project, ProjectApplication, Rating, Message, Event, EventParticipant, Wallet, Transaction
 from app.utils.helpers import login_required, success_response, error_response
+
+# 注册蓝图
+from app.routes.auth import bp as auth_bp
+app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
+
+@app.route('/')
+def hello():
+    return {'message': '艺联萌后端已启动！'}
+
+@app.route('/api/v1')
+def api_root():
+    return {'message': '艺联萌 API v1', 'status': 'running'}

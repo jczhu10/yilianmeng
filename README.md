@@ -52,7 +52,11 @@
 | 需求分析 | ✅ 完成 | 产品思维导图分析、API接口规范文档 |
 | 技术架构设计 | ✅ 完成 | 目录结构设计、数据库模型设计 |
 | 数据库搭建 | ✅ 完成 | 11个核心模型、12张表结构创建 |
-| API接口开发 | 🔄 待开始 | 用户认证、档案、作品、广场等模块 |
+| 用户认证模块 | ✅ 完成 | 5个接口：验证码、登录/注册、Token刷新、用户信息、登出 |
+| 创作者档案模块 | ⏳ 待开始 | 档案CRUD、技能标签、头像上传 |
+| 作品发布模块 | ⏳ 待开始 | 文件上传、作品CRUD、作品列表 |
+| 创作广场模块 | ⏳ 待开始 | 作品流、项目招募、申请参与 |
+| 其他模块 | ⏳ 待开始 | 评分、消息、供需、活动、钱包 |
 | 前端开发 | ⏳ 待开始 | APP页面开发、接口联调 |
 
 ### 第1个月目标（~8.1）：需求定型 + 视觉风格确立
@@ -82,8 +86,11 @@ yilianmeng-main/
 │   │   ├── message.py       # 消息模型
 │   │   ├── event.py         # 活动模型
 │   │   └── wallet.py        # 钱包模型
-│   ├── routes/              # API 路由（待创建）
+│   ├── routes/              # API 路由
+│   │   ├── __init__.py
+│   │   └── auth.py          # 用户认证接口（已完成）
 │   └── utils/               # 工具函数
+│       ├── __init__.py
 │       └── helpers.py       # 通用辅助函数（Token、文件上传等）
 ├── migrations/              # 数据库迁移文件
 │   └── versions/            # 迁移版本记录
@@ -102,19 +109,19 @@ yilianmeng-main/
 
 ## 数据库表结构
 
-| 表名 | 说明 |
-|------|------|
-| `users` | 用户表 |
-| `profiles` | 创作者档案表 |
-| `works` | 作品表 |
-| `projects` | 项目表 |
-| `project_applications` | 项目申请表 |
-| `ratings` | 评分表 |
-| `messages` | 消息表 |
-| `events` | 活动表 |
-| `event_participants` | 活动参与者表 |
-| `wallets` | 钱包表 |
-| `transactions` | 交易记录表 |
+| 表名 | 说明 | 状态 |
+|------|------|------|
+| `users` | 用户表 | ✅ 已创建 |
+| `profiles` | 创作者档案表 | ✅ 已创建 |
+| `works` | 作品表 | ✅ 已创建 |
+| `projects` | 项目表 | ✅ 已创建 |
+| `project_applications` | 项目申请表 | ✅ 已创建 |
+| `ratings` | 评分表 | ✅ 已创建 |
+| `messages` | 消息表 | ✅ 已创建 |
+| `events` | 活动表 | ✅ 已创建 |
+| `event_participants` | 活动参与者表 | ✅ 已创建 |
+| `wallets` | 钱包表 | ✅ 已创建 |
+| `transactions` | 交易记录表 | ✅ 已创建 |
 
 ## API 接口规范
 
@@ -137,19 +144,28 @@ yilianmeng-main/
 }
 ```
 
-### 接口模块
+### 已实现接口
 
-| 模块 | 路径前缀 | 说明 |
-|------|----------|------|
-| 用户认证 | `/auth` | 登录/注册/验证码/Token刷新 |
-| 创作者档案 | `/profile` | 档案管理/技能标签 |
-| 作品发布 | `/works` | 作品CRUD/文件上传 |
-| 创作广场 | `/square` | 作品流/项目招募/申请参与 |
-| 评分与等级 | `/ratings` / `/level` | 互评/等级查询 |
-| 消息 | `/messages` | 私信/系统通知 |
-| 供需对接 | `/market` | 招聘/求职/项目发布 |
-| 主题活动 | `/events` | 活动列表/参与/排行榜 |
-| 艺联币 | `/wallet` | 钱包/交易/提现 |
+| 模块 | 接口 | 方法 | 路径 | 认证 | 状态 |
+|------|------|------|------|------|------|
+| 用户认证 | 发送验证码 | POST | `/auth/send-code` | 否 | ✅ |
+| 用户认证 | 登录/注册 | POST | `/auth/login` | 否 | ✅ |
+| 用户认证 | 刷新Token | POST | `/auth/refresh` | 是 | ✅ |
+| 用户认证 | 获取用户信息 | GET | `/auth/me` | 是 | ✅ |
+| 用户认证 | 登出 | POST | `/auth/logout` | 是 | ✅ |
+
+### 待实现接口
+
+| 模块 | 路径前缀 | 说明 | 状态 |
+|------|----------|------|------|
+| 创作者档案 | `/profile` | 档案管理/技能标签 | ⏳ |
+| 作品发布 | `/works` | 作品CRUD/文件上传 | ⏳ |
+| 创作广场 | `/square` | 作品流/项目招募/申请参与 | ⏳ |
+| 评分与等级 | `/ratings` / `/level` | 互评/等级查询 | ⏳ |
+| 消息 | `/messages` | 私信/系统通知 | ⏳ |
+| 供需对接 | `/market` | 招聘/求职/项目发布 | ⏳ |
+| 主题活动 | `/events` | 活动列表/参与/排行榜 | ⏳ |
+| 艺联币 | `/wallet` | 钱包/交易/提现 | ⏳ |
 
 ## 本地运行
 
@@ -215,12 +231,96 @@ JWT_SECRET_KEY=随机字符串
 JWT_EXPIRES_IN=7
 ```
 
+## 如何检验
+
+### 1. 启动服务
+
+```bash
+cd C:\Users\z1595\Desktop\yilianmeng-main
+.\venv\Scripts\activate
+python app.py
+```
+
+服务启动后访问：http://localhost:8080
+
+### 2. 测试接口（使用 Python requests）
+
+创建一个测试脚本 `test_api.py`：
+
+```python
+import requests
+import json
+
+BASE_URL = 'http://localhost:8080/api/v1'
+
+def print_result(name, response):
+    print(f'\n=== {name} ===')
+    print(f'状态码: {response.status_code}')
+    print(f'响应: {json.dumps(response.json(), ensure_ascii=False, indent=2)}')
+
+# 1. 发送验证码
+r = requests.post(f'{BASE_URL}/auth/send-code', json={'phone': '13800000000'})
+print_result('发送验证码', r)
+dev_code = r.json()['data']['dev_code']
+
+# 2. 登录
+r = requests.post(f'{BASE_URL}/auth/login', json={'phone': '13800000000', 'code': dev_code})
+print_result('登录/注册', r)
+token = r.json()['data']['token']
+print(f'\nToken: {token}')
+
+# 3. 获取用户信息
+r = requests.get(f'{BASE_URL}/auth/me', headers={'Authorization': f'Bearer {token}'})
+print_result('获取用户信息', r)
+
+# 4. 刷新Token
+r = requests.post(f'{BASE_URL}/auth/refresh', headers={'Authorization': f'Bearer {token}'})
+print_result('刷新Token', r)
+
+# 5. 登出
+r = requests.post(f'{BASE_URL}/auth/logout', headers={'Authorization': f'Bearer {token}'})
+print_result('登出', r)
+
+# 6. 未认证访问（应返回401）
+r = requests.get(f'{BASE_URL}/auth/me')
+print_result('未认证访问（预期401）', r)
+```
+
+运行测试：
+```bash
+python test_api.py
+```
+
+### 3. 验证数据库
+
+```bash
+# 查看用户表数据
+mysql -u root -p yilianmeng -e "SELECT * FROM users;"
+```
+
+### 4. 验证清单
+
+| 检验项 | 预期结果 |
+|--------|----------|
+| 服务启动 | http://localhost:8080 可访问 |
+| 发送验证码 | 返回 `dev_code` 字段 |
+| 登录新用户 | 返回 `is_new_user: true` 和 Token |
+| 登录老用户 | 返回 `is_new_user: false` 和 Token |
+| 获取用户信息 | 返回用户信息，手机号脱敏 |
+| Token刷新 | 返回新的 Token |
+| 登出 | 返回成功 |
+| 未认证访问 | 返回 401 错误 |
+| 验证码过期 | 5分钟后验证返回过期 |
+| 验证码防刷 | 60秒内重复发送返回限制 |
+| 数据库验证 | users 表中有新增用户 |
+
 ## 开发日志
 
 | 日期 | 文件 | 内容 |
 |------|------|------|
 | 2026-07-20 | `work-logs/2026-07-20_phase1.md` | 项目分析与技术架构设计 |
 | 2026-07-20 | `work-logs/2026-07-20_database-setup.md` | 数据库模型设计与表结构创建 |
+| 2026-07-20 | `work-logs/2026-07-20_auth-module.md` | 用户认证模块开发 |
 
 ## 开发规范
 
