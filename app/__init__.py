@@ -1,4 +1,4 @@
-from flask import Flask
+﻿from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -20,6 +20,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.dirname(os.pa
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = int(os.getenv('JWT_EXPIRES_IN', 7)) * 24 * 3600
+app.config['ALLOWED_EXTENSIONS'] = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov'}
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -38,6 +39,8 @@ from app.routes.auth import bp as auth_bp
 app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
 from app.routes.profile import bp as profile_bp
 app.register_blueprint(profile_bp, url_prefix='/api/v1/profile')
+from app.routes.works import bp as works_bp
+app.register_blueprint(works_bp, url_prefix='/api/v1/works')
 
 @app.route('/')
 def hello():
