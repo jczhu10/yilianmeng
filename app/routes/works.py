@@ -291,3 +291,131 @@ def upload_file():
     except Exception as e:
         logger.error(f'文件上传失败: {e}')
         return error_response(ErrorCode.PARAM_ERROR, '文件上传失败', http_code=500)
+
+
+# ===== 推流 / 搜索 / 按技能筛选 =====
+ALLOWED_SORT = {'latest', 'hot'}
+
+
+def build_work_list_item(work, author=None, current_user_id=None):
+    """构造推流/搜索列表的作品项，附加作者信息和当前用户是否已点赞"""
+    item = work.to_dict()
+    if author is None:
+        author = User.query.get(work.user_id)
+    item['author'] = author.to_dict() if author else None
+    if current_user_id is not None:
+        from app.models import Like
+        item['is_liked'] = Like.query.filter_by(user_id=current_user_id, work_id=work.id).first() is not None
+    else:
+        item['is_liked'] = False
+    return item
+
+
+# 8. 首页推荐推流
+@bp.route('/feed', methods=['GET'])
+@login_required
+def get_feed():
+    """首页推荐推流。
+    排序:
+      - latest: 按发布时间倒序(默认)
+      - hot: 按热度分(like_count*2 + view_count)倒序, 热度分相同按时间倒序
+    筛选:
+      - channel: writing/visual/video/voice, 可选
+      - exclude_self: 默认 true 排除当前用户自己的作品, 传 false 可包含
+    """
+    page, page_size = get_pagination_params()
+    sort = request.args.get('sort', 'latest')
+    if sort not in ALLOWED_SORT:
+        return error_response(ErrorCode.PARAM_ERROR, '排序参数不合法', http_code=400)
+
+    channel = request.args.get('channel')
+    if channel and channel not in ALLOWED_CHANNELS:
+        return error_response(ErrorCode.CHANNEL_INVALID, '渠道不合法', http_code=400)
+
+    exclude_self = request.args.get('exclude_self', 'true').lower() != 'false'
+
+    query = Work.query.filter(Work.status == 'published')
+    if exclude_self:
+        query = query.filter(Work.user_id != request.user.id)
+    if channel:
+        query = query.filter(Work.channel == channel)
+
+    if sort == 'hot':
+        hot_score = (Work.like_count * 2 + Work.view_count)
+        query = query.order_by(hot_score.desc(), Work.created_at.desc())
+    else:
+        query = query.order_by(Work.created_at.desc())
+
+    result = format_pagination(query, page, page_size)
+    author_ids = list({w.user_id for w in result['list']})
+    authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+    result['list'] = [build_work_list_item(w, author=authors.get(w.user_id), current_user_id=request.user.id) for w in result['list']]
+    return success_response(data=result)
+
+
+# 9. 搜索作品
+@bp.route('/search', methods=['GET'])
+@login_required
+def search_works():
+    """按标题/描述关键词搜索已发布作品, 可叠加 channel 筛选, 按时间倒序。"""
+    keyword = (request.args.get('q') or '').strip()
+    if not keyword:
+        return error_response(ErrorCode.PARAM_ERROR, '搜索关键词不能为空', http_code=400)
+    if len(keyword) > 100:
+        return error_response(ErrorCode.PARAM_ERROR, '关键词过长', http_code=400)
+
+    channel = request.args.get('channel')
+    if channel and channel not in ALLOWED_CHANNELS:
+        return error_response(ErrorCode.CHANNEL_INVALID, '渠道不合法', http_code=400)
+
+    page, page_size = get_pagination_params()
+    like_pattern = f'%{keyword}%'
+    query = Work.query.filter(
+        Work.status == 'published',
+        db.or_(Work.title.like(like_pattern), Work.description.like(like_pattern))
+    )
+    if channel:
+        query = query.filter(Work.channel == channel)
+    query = query.order_by(Work.created_at.desc())
+
+    result = format_pagination(query, page, page_size)
+    author_ids = list({w.user_id for w in result['list']})
+    authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+    result['list'] = [build_work_list_item(w, author=authors.get(w.user_id), current_user_id=request.user.id) for w in result['list']]
+    return success_response(data=result)
+
+
+# 10. 按技能标签筛选作品
+@bp.route('/by-skill', methods=['GET'])
+@login_required
+def get_works_by_skill():
+    """按技能标签筛选已发布作品。
+    参数:
+      - skill_id: 必填, 技能ID
+      - sort: latest/hot, 默认 latest
+    """
+    skill_id = request.args.get('skill_id', type=int)
+    if not skill_id:
+        return error_response(ErrorCode.PARAM_ERROR, 'skill_id 不能为空', http_code=400)
+
+    sort = request.args.get('sort', 'latest')
+    if sort not in ALLOWED_SORT:
+        return error_response(ErrorCode.PARAM_ERROR, '排序参数不合法', http_code=400)
+
+    page, page_size = get_pagination_params()
+    from sqlalchemy import text
+    query = Work.query.filter(
+        Work.status == 'published',
+        text("JSON_CONTAINS(skill_tags, CAST(:sid AS JSON))").bindparams(sid=skill_id)
+    )
+    if sort == 'hot':
+        hot_score = (Work.like_count * 2 + Work.view_count)
+        query = query.order_by(hot_score.desc(), Work.created_at.desc())
+    else:
+        query = query.order_by(Work.created_at.desc())
+
+    result = format_pagination(query, page, page_size)
+    author_ids = list({w.user_id for w in result['list']})
+    authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+    result['list'] = [build_work_list_item(w, author=authors.get(w.user_id), current_user_id=request.user.id) for w in result['list']]
+    return success_response(data=result)

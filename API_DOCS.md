@@ -9,7 +9,7 @@
   "data": {...}         # 数据，失败时为 null
 }
 
-**HTTP状态码与业务码分离**: HTTP状态码遵循HTTP语义(200/400/401/403/404/429/500)，Body中的code为业务码(200=成功,1xxx=认证类,2xxx=档案类,3xxx=作品类)。
+**HTTP状态码与业务码分离**: HTTP状态码遵循HTTP语义(200/400/401/403/404/429/500)，Body中的code为业务码(200=成功,1xxx=认证类,2xxx=档案类,3xxx=作品类,4xxx=互动类,5xxx=协作项目类)。
 
 ---
 
@@ -36,6 +36,20 @@
 | 3004 | 渠道不合法 | 400 |
 | 3005 | 文件数量超限 | 400 |
 | 3006 | 技能标签无效 | 400 |
+| 4001 | 作品不存在或未发布 | 404 |
+| 4002 | 无权删除他人评论 | 403 |
+| 4003 | 已点赞过该作品 | 400 |
+| 4004 | 未点赞过该作品 | 400 |
+| 4005 | 评论/父评论不存在 | 404 |
+| 4006 | 评论内容不能为空 | 400 |
+| 4007 | 回复层级超限 | 400 |
+| 5001 | 项目不存在 | 404 |
+| 5002 | 无权操作（非发起人） | 403 |
+| 5003 | 项目状态不允许此操作 | 400 |
+| 5004 | 不能申请自己的项目 | 400 |
+| 5005 | 已申请过该项目 | 400 |
+| 5006 | 申请不存在 | 404 |
+| 5007 | 申请已处理 | 400 |
 
 ---
 
@@ -341,6 +355,311 @@ curl -X POST http://localhost:8080/api/v1/works/upload -H "Authorization: Bearer
 
 ---
 
+# 模块四：互动（interactions）  前缀 /api/v1
+
+仅已发布（published）作品可被点赞/评论。草稿/已删除作品返回 4001（与"作品不存在"同错误码，避免泄露存在性）。
+
+## 4.1 点赞作品
+POST /works/<work_id>/like  [需登录]
+
+路径参数: work_id (int, 必填) 已发布作品ID
+无请求参数。每个用户对同一作品只能点赞一次（DB 唯一索引 + 业务校验）。
+
+成功返回:
+{ "code": 200, "message": "点赞成功", "data": { "like_count": 5 } }
+
+失败:
+- { "code": 4001, "message": "作品不存在或未发布" } (HTTP 404)
+- { "code": 4003, "message": "已点赞过该作品" } (HTTP 400)
+
+## 4.2 取消点赞
+DELETE /works/<work_id>/like  [需登录]
+
+成功返回: { "code": 200, "message": "已取消点赞", "data": { "like_count": 4 } }
+失败: { "code": 4004, "message": "未点赞过该作品" } (HTTP 400)
+
+## 4.3 获取作品点赞用户列表
+GET /works/<work_id>/likes  [需登录]
+
+查询参数: page (默认1), page_size (默认20, 最大100)
+成功返回:
+{
+  "code": 200, "message": "success",
+  "data": {
+    "list": [
+      { "like_id": 1, "user_id": 5, "work_id": 1, "created_at": "...",
+        "user": { "user_id": 5, "nickname": "用户8002", "avatar": "", ... } }
+    ],
+    "total": 1, "page": 1, "page_size": 20, "total_pages": 1
+  }
+}
+
+## 4.4 发表评论 / 回复
+POST /works/<work_id>/comments  [需登录]
+
+请求参数(JSON Body):
+- content (string, 必填) 评论内容，1-2000字符
+- parent_id (int, 可选) 回复的根评论ID。不传为一级评论；传则回复该评论
+
+请求示例:
+- 一级评论: { "content": "很好的作品" }
+- 回复: { "content": "谢谢支持", "parent_id": 10 }
+
+> 回复层级限制：parent_id 必须指向一级评论，不能对回复再回复（否则返回 4007）。
+
+成功返回:
+{
+  "code": 200, "message": "评论成功",
+  "data": {
+    "comment_id": 10, "user_id": 5, "work_id": 1, "parent_id": null,
+    "content": "很好的作品", "is_deleted": false,
+    "created_at": "...", "updated_at": "...",
+    "user": { "user_id": 5, "nickname": "用户8002", ... }
+  }
+}
+
+失败:
+- { "code": 4006, "message": "评论内容不能为空" } (HTTP 400)
+- { "code": 4005, "message": "父评论不存在" } (HTTP 404)
+- { "code": 4007, "message": "回复层级超限，只能回复一级评论" } (HTTP 400)
+
+## 4.5 获取作品评论列表（一级评论）
+GET /works/<work_id>/comments  [需登录]
+
+查询参数: page, page_size
+只返回一级评论（parent_id IS NULL），按时间倒序。每条评论含 reply_count 回复数。
+
+成功返回:
+{
+  "code": 200, "message": "success",
+  "data": {
+    "list": [
+      { "comment_id": 10, "user_id": 5, "work_id": 1, "parent_id": null,
+        "content": "很好的作品", "is_deleted": false,
+        "created_at": "...", "updated_at": "...",
+        "user": { "user_id": 5, ... },
+        "reply_count": 2 }
+    ],
+    "total": 1, "page": 1, "page_size": 20, "total_pages": 1
+  }
+}
+
+> 软删除评论 content 显示 "[已删除]"，is_deleted=true。
+
+## 4.6 删除评论（软删除）
+DELETE /comments/<comment_id>  [需登录，仅评论作者]
+
+成功返回: { "code": 200, "message": "评论已删除", "data": null }
+失败:
+- { "code": 4005, "message": "评论不存在" } (HTTP 404)
+- { "code": 4002, "message": "无权删除他人评论" } (HTTP 403)
+
+> 仅评论作者可删，作品作者也无权删他人评论。删除后评论不消失，content 变为 "[已删除]"。
+
+## 4.7 获取评论的回复列表
+GET /comments/<comment_id>/replies  [需登录]
+
+查询参数: page, page_size
+返回指定一级评论下的所有回复，按时间正序。
+
+成功返回:
+{
+  "code": 200, "message": "success",
+  "data": {
+    "list": [
+      { "comment_id": 11, "user_id": 4, "work_id": 1, "parent_id": 10,
+        "content": "谢谢支持", "is_deleted": false,
+        "created_at": "...", "updated_at": "...",
+        "user": { "user_id": 4, ... } }
+    ],
+    "total": 1, "page": 1, "page_size": 20, "total_pages": 1
+  }
+}
+
+---
+
+# 模块五：作品推荐推流（feed）  前缀 /api/v1/works
+
+三个接口只返回 status=published 的作品。列表项均内置 author（作者信息）和 is_liked（当前用户是否已点赞），前端无需二次查询。
+
+## 5.1 首页推荐推流
+GET /works/feed  [需登录]
+
+查询参数:
+- sort (string, 可选) 排序：latest(最新,默认)/hot(热门)
+- channel (string, 可选) 筛选：writing/visual/video/voice
+- exclude_self (bool, 可选) 是否排除自己的作品，默认 true
+- page (int, 可选) 默认1
+- page_size (int, 可选) 默认20，最大100
+
+> 热门排序公式：热度分 = like_count * 2 + view_count，按热度倒序，相同分按时间倒序。
+
+请求示例:
+- 最新: GET /works/feed?sort=latest&page=1
+- 热门: GET /works/feed?sort=hot
+- 分类: GET /works/feed?channel=visual
+- 含自己: GET /works/feed?exclude_self=false
+
+成功返回:
+{
+  "code": 200, "message": "success",
+  "data": {
+    "list": [
+      { "work_id": 1, "user_id": 4, "title": "...", "description": "...",
+        "channel": "writing", "files": [...], "cover_url": "...",
+        "is_collaborative": false, "collaborators": [], "skill_tags": [1,2],
+        "status": "published", "view_count": 5, "like_count": 3,
+        "created_at": "...", "updated_at": "...",
+        "author": { "user_id": 4, "nickname": "用户8000", ... },
+        "is_liked": false }
+    ],
+    "total": 10, "page": 1, "page_size": 20, "total_pages": 1
+  }
+}
+
+失败: { "code": 400, "message": "排序参数不合法" } / { "code": 3004, "message": "渠道不合法" }
+
+## 5.2 搜索作品
+GET /works/search  [需登录]
+
+查询参数:
+- q (string, 必填) 关键词，匹配 title/description，最长100字符
+- channel (string, 可选) 渠道筛选
+- page, page_size
+
+请求示例: GET /works/search?q=Python&page=1
+成功返回: 同 5.1 分页结构
+失败: { "code": 400, "message": "搜索关键词不能为空" }
+
+> 搜索为模糊匹配（LIKE %keyword%），中文搜索依赖 MySQL utf8mb4 字符集。
+
+## 5.3 按技能标签筛选作品
+GET /works/by-skill  [需登录]
+
+查询参数:
+- skill_id (int, 必填) 技能ID（skills 表 id）
+- sort (string, 可选) latest/hot，默认 latest
+- page, page_size
+
+请求示例: GET /works/by-skill?skill_id=1&sort=hot
+成功返回: 同 5.1 分页结构
+失败: { "code": 400, "message": "skill_id 不能为空" }
+
+> 用 MySQL JSON_CONTAINS 查询 skill_tags 数组。skill_id 可从 /profile/skills 获取。
+
+---
+
+---
+
+# 模块六：协作项目（projects）  前缀 /api/v1/projects
+
+创作者可发起协作项目招募成员，成员可申请加入，发起人审批。状态流转：recruiting(招募中) → ongoing(进行中,首个申请通过自动转) → completed/closed。
+
+## 6.1 发起协作项目
+POST /projects/  [需登录]
+
+请求参数(JSON Body):
+- title (string, 必填) 最长200字符
+- description (string, 可选) 最长2000字符
+- required_skills (int[], 可选) 技能ID数组，最多10个
+- mode (string, 可选) free(无偿,默认)/paid(有偿)
+- budget (int, 可选) 预算，默认0
+- deadline (string, 可选) ISO 8601 格式
+
+请求示例:
+{ "title": "短视频协作", "required_skills": [1,2], "mode": "free", "deadline": "2026-08-15T23:59:59" }
+
+成功返回:
+{ "code": 200, "message": "项目创建成功",
+  "data": { "project_id": 1, ..., "status": "recruiting", "creator": {...}, "is_creator": true, "member_count": 1, "my_application": null } }
+
+失败: { "code": 400, "message": "标题不能为空" } / { "code": 400, "message": "存在无效的技能ID" }
+
+## 6.2 项目列表
+GET /projects/  [需登录]
+
+查询参数: status(recruiting/ongoing/completed/closed) / mode(free/paid) / skill_id(int) / page / page_size
+> 不传 status 默认不返回 closed 项目。
+
+成功返回: 分页结构，list 项含 creator / is_creator / member_count / my_application
+失败: { "code": 400, "message": "状态参数不合法" }
+
+## 6.3 项目详情
+GET /projects/<project_id>  [需登录]
+
+权限分层:
+- 发起人：返回 applications 申请列表（含 applicant）
+- 非发起人 + ongoing/completed：返回 members 成员列表
+- 其他：applications/members 为 null
+
+成功返回:
+{ "code": 200, "data": { ..., "is_creator": true/false, "member_count": 3,
+  "my_application": { "id": 5, "status": "pending", ... } 或 null,
+  "applications": [...] 或 null,
+  "members": [...] 或 null } }
+
+失败: { "code": 5001, "message": "项目不存在" } (HTTP 404)
+
+## 6.4 编辑项目
+PUT /projects/<project_id>  [需登录，仅发起人，仅 recruiting 状态]
+
+请求参数: 同 6.1，所有字段可选
+成功返回: 同 6.1，message="项目更新成功"
+失败:
+- { "code": 5002, "message": "无权操作，仅发起人可编辑" } (HTTP 403)
+- { "code": 5003, "message": "当前状态(ongoing)不可编辑，仅 recruiting 状态可编辑" } (HTTP 400)
+
+## 6.5 申请加入项目
+POST /projects/<project_id>/apply  [需登录]
+
+请求参数(JSON Body): message (string, 可选) 申请理由，最长500字符
+
+成功返回:
+{ "code": 200, "message": "申请已提交",
+  "data": { "id": 5, "project_id": 1, "user_id": 5, "message": "...", "status": "pending", "processed_at": null, "applicant": {...} } }
+
+失败:
+- { "code": 5004, "message": "不能申请自己发起的项目" } (HTTP 400)
+- { "code": 5005, "message": "已申请过该项目" } (HTTP 400)
+- { "code": 5003, "message": "该项目不在招募中，无法申请" } (HTTP 400)
+
+## 6.6 通过申请
+POST /projects/<project_id>/applications/<app_id>/approve  [需登录，仅发起人]
+
+成功返回: { "code": 200, "message": "已通过该申请", "data": { "id": 5, "status": "approved", "processed_at": "...", ... } }
+> 通过后项目自动转 ongoing。
+
+失败:
+- { "code": 5002, "message": "无权通过，仅发起人可操作" } (HTTP 403)
+- { "code": 5003, "message": "项目不在招募中，无法审批" } (HTTP 400)
+- { "code": 5006, "message": "申请不存在" } (HTTP 404)
+- { "code": 5007, "message": "申请已处理（approved/rejected）" } (HTTP 400)
+
+## 6.7 拒绝申请
+POST /projects/<project_id>/applications/<app_id>/reject  [需登录，仅发起人]
+
+成功返回: { "code": 200, "message": "已拒绝该申请", "data": { "id": 5, "status": "rejected", ... } }
+失败: 同 6.6
+
+## 6.8 关闭项目
+POST /projects/<project_id>/close  [需登录，仅发起人]
+
+成功返回: { "code": 200, "message": "项目已关闭", "data": null }
+失败: { "code": 5002, "message": "无权操作，仅发起人可关闭" } (HTTP 403)
+> 重复关闭幂等返回成功。
+
+## 6.9 我的项目
+GET /projects/mine  [需登录]
+
+查询参数: role(all/created/joined) / page / page_size
+
+请求示例:
+- 全部: GET /projects/mine
+- 我发起的: GET /projects/mine?role=created
+- 我参与的: GET /projects/mine?role=joined
+
+成功返回: 分页结构，list 项同 6.2
+
 # 附录：完整调用流程示例
 
 ## 新用户首次使用
@@ -352,6 +671,22 @@ curl -X POST http://localhost:8080/api/v1/works/upload -H "Authorization: Bearer
 6. POST /works/upload          (file)                        -> 上传文件拿url
 7. POST /works/                { title, files:[url], status:"draft" } -> 存草稿
 8. POST /works/<id>/publish                                   -> 发布
+
+## 浏览与互动
+9. GET  /works/feed?sort=latest                                    -> 首页推荐流
+10. GET /works/search?q=Python                                      -> 搜索作品
+11. GET /works/by-skill?skill_id=1                                  -> 按技能筛选
+12. POST /works/<id>/like                                            -> 点赞
+13. POST /works/<id>/comments   { content }                         -> 发表评论
+14. GET  /works/<id>/comments                                       -> 查看评论
+15. DELETE /comments/<id>                                            -> 删除评论
+
+## 协作项目
+16. POST /projects/   { title, required_skills, mode }          -> 发起项目
+17. GET  /projects/?status=recruiting                                   -> 浏览招募中项目
+18. POST /projects/<id>/apply   { message }                              -> 申请加入
+19. POST /projects/<id>/applications/<app_id>/approve                   -> 通过申请（项目转 ongoing）
+20. GET  /projects/mine?role=created                                     -> 我发起的项目
 
 ## Token刷新机制
 - Token有效期 7 天

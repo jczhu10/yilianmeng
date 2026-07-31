@@ -44,6 +44,7 @@ class ProjectApplication(db.Model):
     message = db.Column(db.Text, default='')
     status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, comment='审批时间')
     
     def to_dict(self):
         return {
@@ -52,5 +53,6 @@ class ProjectApplication(db.Model):
             'user_id': self.user_id,
             'message': self.message,
             'status': self.status,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None
         }

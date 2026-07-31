@@ -41,6 +41,10 @@ from app.routes.profile import bp as profile_bp
 app.register_blueprint(profile_bp, url_prefix='/api/v1/profile')
 from app.routes.works import bp as works_bp
 app.register_blueprint(works_bp, url_prefix='/api/v1/works')
+from app.routes.interactions import bp as interactions_bp
+app.register_blueprint(interactions_bp, url_prefix='/api/v1')
+from app.routes.projects import bp as projects_bp
+app.register_blueprint(projects_bp, url_prefix='/api/v1/projects')
 
 @app.route('/')
 def hello():
