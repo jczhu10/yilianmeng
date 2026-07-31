@@ -36,20 +36,20 @@ def generate_code():
 def send_code():
     data = request.get_json()
     if not data:
-        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空')
+        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
     
     phone = data.get('phone', '').strip()
     if not phone:
         return error_response(ErrorCode.PARAM_ERROR, '手机号不能为空')
     
     if not is_valid_phone(phone):
-        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确')
+        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
     
     # 60秒内不能重复发送
     if phone in verification_codes:
         _, _, send_time = verification_codes[phone]
         if (datetime.now() - send_time).total_seconds() < 60:
-            return error_response(ErrorCode.RATE_LIMITED, '验证码发送过于频繁，请60秒后重试')
+            return error_response(ErrorCode.RATE_LIMITED, '验证码发送过于频繁，请60秒后重试', http_code=429)
     
     # 生成验证码
     code = generate_code()
@@ -70,7 +70,7 @@ def send_code():
 def login():
     data = request.get_json()
     if not data:
-        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空')
+        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
     
     phone = data.get('phone', '').strip()
     code = data.get('code', '').strip()
@@ -79,20 +79,20 @@ def login():
         return error_response(ErrorCode.PARAM_ERROR, '手机号和验证码不能为空')
     
     if not is_valid_phone(phone):
-        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确')
+        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
     
     # 校验验证码
     if phone not in verification_codes:
-        return error_response(ErrorCode.CODE_SENT_FIRST, '请先发送验证码')
+        return error_response(ErrorCode.CODE_SENT_FIRST, '请先发送验证码', http_code=400)
     
     stored_code, expire_time, _ = verification_codes[phone]
     if datetime.now() > expire_time:
         del verification_codes[phone]
-        return error_response(ErrorCode.CODE_EXPIRED, '验证码已过期，请重新获取')
+        return error_response(ErrorCode.CODE_EXPIRED, '验证码已过期，请重新获取', http_code=400)
     
     if code != stored_code:
         logger.warning(f'验证码错误: phone={phone}')
-        return error_response(ErrorCode.CODE_ERROR, '验证码错误')
+        return error_response(ErrorCode.CODE_ERROR, '验证码错误', http_code=400)
     
     # 验证成功，清除验证码
     del verification_codes[phone]

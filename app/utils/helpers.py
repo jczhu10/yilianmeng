@@ -66,8 +66,8 @@ def login_required(f):
 def success_response(data=None, message='success'):
     return jsonify({'code': 200, 'message': message, 'data': data})
 
-def error_response(code, message):
-    return jsonify({'code': code, 'message': message, 'data': None}), code
+def error_response(code, message, http_code=400):
+    return jsonify({'code': code, 'message': message, 'data': None}), http_code
 
 def get_pagination_params():
     page = request.args.get('page', 1, type=int)

@@ -26,12 +26,18 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-from app.models import User, Profile, Work, Project, ProjectApplication, Rating, Message, Event, EventParticipant, Wallet, Transaction
+from app.models import (
+    User, Profile, Work, Project, ProjectApplication,
+    Rating, Message, Event, EventParticipant, Wallet, Transaction,
+    SkillCategory, Skill, ProfileSkill
+)
 from app.utils.helpers import login_required, success_response, error_response
 
 # 注册蓝图
 from app.routes.auth import bp as auth_bp
 app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
+from app.routes.profile import bp as profile_bp
+app.register_blueprint(profile_bp, url_prefix='/api/v1/profile')
 
 @app.route('/')
 def hello():
