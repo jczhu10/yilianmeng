@@ -2,15 +2,15 @@ import re
 import random
 import logging
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from app import db
-from app.models import User
+from app.models import User, Profile
 from app.utils.helpers import create_token, login_required, success_response, error_response
 
 bp = Blueprint('auth', __name__)
 logger = logging.getLogger(__name__)
 
-# 业务错误码
+
 class ErrorCode:
     PARAM_ERROR = 400
     UNAUTHORIZED = 401
@@ -19,134 +19,242 @@ class ErrorCode:
     CODE_ERROR = 1002
     CODE_EXPIRED = 1003
     CODE_SENT_FIRST = 1004
+    PHONE_REGISTERED = 1005
+    LOGIN_FAILED = 1006
+    PASSWORD_FORMAT_ERROR = 1007
+    SCENE_INVALID = 1008
 
-# 开发阶段：内存存储验证码 {phone: (code, expire_time, send_time)}
+
+# 验证码存储 {phone: {'code': code, 'expire': dt, 'sent': dt, 'scene': scene}}
 verification_codes = {}
 
-# 手机号格式校验
-def is_valid_phone(phone):
-    return bool(re.match(r'^1[3-9]\d{9}$', phone))
+ALLOWED_SCENES = {'register', 'reset'}
+PHONE_RE = re.compile(r'^1[3-9]\d{9}$')
+# 密码：8-20位，含字母+数字
+PASSWORD_RE = re.compile(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$')
 
-# 生成6位随机验证码
+
+def is_valid_phone(phone):
+    return bool(PHONE_RE.match(phone))
+
+
+def is_valid_password(password):
+    return bool(PASSWORD_RE.match(password))
+
+
 def generate_code():
     return ''.join(random.choices('0123456789', k=6))
 
-# 发送验证码
+
+# 1. 发送验证码
 @bp.route('/send-code', methods=['POST'])
 def send_code():
     data = request.get_json()
     if not data:
         return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
-    
+
     phone = data.get('phone', '').strip()
+    scene = data.get('scene', '').strip()
+
     if not phone:
         return error_response(ErrorCode.PARAM_ERROR, '手机号不能为空')
-    
     if not is_valid_phone(phone):
         return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
-    
-    # 60秒内不能重复发送
+    if scene not in ALLOWED_SCENES:
+        return error_response(ErrorCode.SCENE_INVALID, '场景参数不合法，需为 register/reset', http_code=400)
+
+    # 场景业务校验
+    if scene == 'register':
+        # 注册场景：手机号不能已注册
+        if User.query.filter_by(phone=phone).first():
+            return error_response(ErrorCode.PHONE_REGISTERED, '该手机号已注册', http_code=400)
+    elif scene == 'reset':
+        # 重置场景：手机号必须已注册
+        if not User.query.filter_by(phone=phone).first():
+            return error_response(ErrorCode.LOGIN_FAILED, '该手机号未注册', http_code=400)
+
+    # 60秒限流
     if phone in verification_codes:
-        _, _, send_time = verification_codes[phone]
-        if (datetime.now() - send_time).total_seconds() < 60:
+        sent = verification_codes[phone]['sent']
+        if (datetime.now() - sent).total_seconds() < 60:
             return error_response(ErrorCode.RATE_LIMITED, '验证码发送过于频繁，请60秒后重试', http_code=429)
-    
-    # 生成验证码
+
     code = generate_code()
-    expire_time = datetime.now() + timedelta(minutes=5)
-    send_time = datetime.now()
-    verification_codes[phone] = (code, expire_time, send_time)
-    
-    logger.info(f'验证码已发送: phone={phone}')
-    
-    # 开发模式：直接返回验证码（生产环境应调用短信服务）
+    verification_codes[phone] = {
+        'code': code,
+        'expire': datetime.now() + timedelta(minutes=5),
+        'sent': datetime.now(),
+        'scene': scene
+    }
+    logger.info(f'验证码已发送: phone={phone}, scene={scene}')
+
     return success_response(
         data={'dev_code': code},
         message='验证码已发送'
     )
 
-# 登录/注册
+
+# 2. 注册
+@bp.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    if not data:
+        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
+
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+    password = data.get('password', '')
+    nickname = data.get('nickname', '').strip()
+
+    if not phone or not code or not password:
+        return error_response(ErrorCode.PARAM_ERROR, '手机号、验证码、密码不能为空')
+
+    if not is_valid_phone(phone):
+        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
+    if not is_valid_password(password):
+        return error_response(ErrorCode.PASSWORD_FORMAT_ERROR, '密码格式不正确，需8-20位含字母和数字', http_code=400)
+
+    # 校验验证码
+    err = _verify_code(phone, code, 'register')
+    if err:
+        return err
+
+    # 手机号不能已注册
+    if User.query.filter_by(phone=phone).first():
+        return error_response(ErrorCode.PHONE_REGISTERED, '该手机号已注册', http_code=400)
+
+    # 创建用户
+    nickname = nickname or f'用户{phone[-4:]}'
+    user = User(phone=phone, nickname=nickname, is_new_user=True)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.flush()  # 拿 user.id
+
+    # 自动建空档案
+    profile = Profile(user_id=user.id, identity='艺术爱好者')
+    db.session.add(profile)
+    db.session.commit()
+
+    logger.info(f'新用户注册: phone={phone}, user_id={user.id}')
+    token = create_token(user.id)
+
+    return success_response(
+        data={'token': token, 'user': user.to_dict(), 'is_new_user': True},
+        message='注册成功'
+    )
+
+
+# 3. 登录（密码模式）
 @bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     if not data:
         return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
-    
+
     phone = data.get('phone', '').strip()
-    code = data.get('code', '').strip()
-    
-    if not phone or not code:
-        return error_response(ErrorCode.PARAM_ERROR, '手机号和验证码不能为空')
-    
+    password = data.get('password', '')
+
+    if not phone or not password:
+        return error_response(ErrorCode.PARAM_ERROR, '手机号和密码不能为空')
+
     if not is_valid_phone(phone):
         return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
-    
-    # 校验验证码
-    if phone not in verification_codes:
-        return error_response(ErrorCode.CODE_SENT_FIRST, '请先发送验证码', http_code=400)
-    
-    stored_code, expire_time, _ = verification_codes[phone]
-    if datetime.now() > expire_time:
-        del verification_codes[phone]
-        return error_response(ErrorCode.CODE_EXPIRED, '验证码已过期，请重新获取', http_code=400)
-    
-    if code != stored_code:
-        logger.warning(f'验证码错误: phone={phone}')
-        return error_response(ErrorCode.CODE_ERROR, '验证码错误', http_code=400)
-    
-    # 验证成功，清除验证码
-    del verification_codes[phone]
-    
-    # 查询用户是否存在
+
     user = User.query.filter_by(phone=phone).first()
-    is_new_user = False
-    
-    if not user:
-        # 新用户自动注册
-        user = User(phone=phone, nickname=f'用户{phone[-4:]}')
-        db.session.add(user)
-        db.session.commit()
-        is_new_user = True
-        logger.info(f'新用户注册: phone={phone}, user_id={user.id}')
-    else:
-        logger.info(f'用户登录: user_id={user.id}')
-    
-    # 生成Token
+    # 统一提示，防撞库
+    if not user or not user.check_password(password):
+        return error_response(ErrorCode.LOGIN_FAILED, '手机号或密码错误', http_code=400)
+
+    logger.info(f'用户登录: user_id={user.id}')
     token = create_token(user.id)
-    
-    # 返回完整用户信息
+
+    # 老用户清除新用户标记
+    if user.is_new_user:
+        user.is_new_user = False
+        db.session.commit()
+
     return success_response(
-        data={
-            'token': token,
-            'user': user.to_dict(),
-            'is_new_user': is_new_user
-        },
+        data={'token': token, 'user': user.to_dict(), 'is_new_user': False},
         message='登录成功'
     )
 
-# 刷新Token
+
+# 4. 重置密码
+@bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    if not data:
+        return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
+
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+    new_password = data.get('new_password', '')
+
+    if not phone or not code or not new_password:
+        return error_response(ErrorCode.PARAM_ERROR, '手机号、验证码、新密码不能为空')
+
+    if not is_valid_phone(phone):
+        return error_response(ErrorCode.PHONE_FORMAT_ERROR, '手机号格式不正确', http_code=400)
+    if not is_valid_password(new_password):
+        return error_response(ErrorCode.PASSWORD_FORMAT_ERROR, '密码格式不正确，需8-20位含字母和数字', http_code=400)
+
+    err = _verify_code(phone, code, 'reset')
+    if err:
+        return err
+
+    user = User.query.filter_by(phone=phone).first()
+    if not user:
+        return error_response(ErrorCode.LOGIN_FAILED, '该手机号未注册', http_code=400)
+
+    user.set_password(new_password)
+    db.session.commit()
+    logger.info(f'密码重置: user_id={user.id}')
+
+    return success_response(message='密码重置成功')
+
+
+# 5. 刷新 token
 @bp.route('/refresh', methods=['POST'])
 @login_required
 def refresh_token():
-    # 直接从 request.user 获取，避免重复验证
     new_token = create_token(request.user.id)
-    
     logger.info(f'Token刷新: user_id={request.user.id}')
-    
-    return success_response(
-        data={'token': new_token},
-        message='Token刷新成功'
-    )
+    return success_response(data={'token': new_token}, message='Token刷新成功')
 
-# 获取当前用户信息
+
+# 6. 获取当前用户信息
 @bp.route('/me', methods=['GET'])
 @login_required
 def get_me():
     return success_response(data=request.user.to_dict())
 
-# 登出
+
+# 7. 退出登录
 @bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logger.info(f'用户登出: user_id={request.user.id}')
     return success_response(message='已退出登录')
+
+
+# ========== 内部工具 ==========
+def _verify_code(phone, code, scene):
+    """校验验证码，返回 error_response 或 None"""
+    if phone not in verification_codes:
+        return error_response(ErrorCode.CODE_SENT_FIRST, '请先发送验证码', http_code=400)
+
+    record = verification_codes[phone]
+    if datetime.now() > record['expire']:
+        del verification_codes[phone]
+        return error_response(ErrorCode.CODE_EXPIRED, '验证码已过期，请重新获取', http_code=400)
+
+    if record['scene'] != scene:
+        return error_response(ErrorCode.CODE_ERROR, '验证码场景不匹配', http_code=400)
+
+    if code != record['code']:
+        logger.warning(f'验证码错误: phone={phone}')
+        return error_response(ErrorCode.CODE_ERROR, '验证码错误', http_code=400)
+
+    # 验证通过，清除
+    del verification_codes[phone]
+    return None

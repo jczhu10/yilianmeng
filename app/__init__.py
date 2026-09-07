@@ -30,7 +30,9 @@ migrate = Migrate(app, db)
 from app.models import (
     User, Profile, Work, Project, ProjectApplication,
     Rating, Message, Event, EventParticipant, Wallet, Transaction,
-    SkillCategory, Skill, ProfileSkill
+    SkillCategory, Skill, ProfileSkill,
+    WorkRepost, WorkVisibilityRule, WorkTop,
+    WorkViewHistory, ProjectViewHistory
 )
 from app.utils.helpers import login_required, success_response, error_response
 
@@ -45,6 +47,18 @@ from app.routes.interactions import bp as interactions_bp
 app.register_blueprint(interactions_bp, url_prefix='/api/v1')
 from app.routes.projects import bp as projects_bp
 app.register_blueprint(projects_bp, url_prefix='/api/v1/projects')
+
+# 消息模块蓝图
+from app.routes.notifications import bp as notifications_bp
+app.register_blueprint(notifications_bp, url_prefix='/api/v1/notifications')
+from app.routes.follows import bp as follows_bp
+app.register_blueprint(follows_bp, url_prefix='/api/v1')
+from app.routes.conversations import bp as conversations_bp
+app.register_blueprint(conversations_bp, url_prefix='/api/v1/conversations')
+from app.routes.groups import bp as groups_bp
+app.register_blueprint(groups_bp, url_prefix='/api/v1/groups')
+from app.routes.messages_upload import bp as messages_upload_bp
+app.register_blueprint(messages_upload_bp, url_prefix='/api/v1/messages')
 
 @app.route('/')
 def hello():

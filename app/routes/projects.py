@@ -158,8 +158,9 @@ def create_project():
         deadline=deadline_dt,
         status='recruiting'
     )
-    project.set_required_skills(valid_skills)
     db.session.add(project)
+    db.session.flush()
+    project.set_required_skills(valid_skills)
     db.session.commit()
     logger.info(f'项目创建: project_id={project.id}, user_id={request.user.id}')
 

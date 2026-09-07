@@ -71,8 +71,10 @@ def error_response(code, message, http_code=400):
 
 def get_pagination_params():
     page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('page_size', 20, type=int)
-    page_size = min(page_size, 100)
+    # 兼容 per_page 和 page_size 两种参数名，默认20
+    page_size = request.args.get('per_page', type=int) or request.args.get('page_size', type=int) or 20
+    # 限制 1-100，防止恶意请求
+    page_size = min(max(page_size, 1), 100)
     return page, page_size
 
 def format_pagination(query, page, page_size):

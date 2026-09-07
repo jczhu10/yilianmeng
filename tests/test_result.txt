@@ -1,0 +1,129 @@
+﻿python : C:\Users\z1595\anaconda3\Lib\site-packages\sqlalchemy\sql\schema.py:3624: DeprecationWarning: datetime.datetim
+e.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetim
+es in UTC: datetime.datetime.now(datetime.UTC).
+At line:15 char:2354
++ ... nmeng-main; python tests/test_all_modules.py > tests/test_result.txt  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\z1595\...(datetime.UTC).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+C:\Users\z1595\Desktop\yilianmeng-main\app\utils\helpers.py:33: DeprecationWarning: datetime.datetime.utcnow() is depre
+cated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime
+.datetime.now(datetime.UTC).
+  'exp': datetime.utcnow() + timedelta(seconds=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
+test_01_create_work_draft (__main__.WorksInteractionsProjectsTest.test_01_create_work_draft) ... C:\Users\z1595\Desktop
+\yilianmeng-main\app\utils\helpers.py:58: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x s
+eries of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated sin
+ce: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  user = User.query.get(user_id)
+ok
+test_02_update_work (__main__.WorksInteractionsProjectsTest.test_02_update_work) ... ok
+test_03_publish_work (__main__.WorksInteractionsProjectsTest.test_03_publish_work) ... ok
+test_04_get_work_detail (__main__.WorksInteractionsProjectsTest.test_04_get_work_detail) ... C:\Users\z1595\Desktop\yil
+ianmeng-main\app\routes\works.py:242: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x serie
+s of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 
+2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  author = User.query.get(work.user_id)
+ok
+test_05_get_my_works (__main__.WorksInteractionsProjectsTest.test_05_get_my_works) ... ok
+test_06_get_feed (__main__.WorksInteractionsProjectsTest.test_06_get_feed) ... ok
+test_07_search_works (__main__.WorksInteractionsProjectsTest.test_07_search_works) ... ok
+test_08_get_works_by_skill (__main__.WorksInteractionsProjectsTest.test_08_get_works_by_skill) ... ok
+test_09_delete_work (__main__.WorksInteractionsProjectsTest.test_09_delete_work) ... ok
+test_10_like_work (__main__.WorksInteractionsProjectsTest.test_10_like_work) ... ok
+test_11_already_liked (__main__.WorksInteractionsProjectsTest.test_11_already_liked) ... ok
+test_12_get_likes (__main__.WorksInteractionsProjectsTest.test_12_get_likes) ... ok
+test_13_create_comment (__main__.WorksInteractionsProjectsTest.test_13_create_comment) ... ok
+test_14_create_reply (__main__.WorksInteractionsProjectsTest.test_14_create_reply) ... C:\Users\z1595\Desktop\yilianmen
+g-main\app\routes\interactions.py:116: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x seri
+es of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since:
+ 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  parent = Comment.query.get(parent_id)
+ok
+test_15_get_comments (__main__.WorksInteractionsProjectsTest.test_15_get_comments) ... ok
+test_16_get_replies (__main__.WorksInteractionsProjectsTest.test_16_get_replies) ... C:\Users\z1595\Desktop\yilianmeng-
+main\app\routes\interactions.py:191: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series
+ of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2
+.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  parent = Comment.query.get(comment_id)
+ok
+test_17_reply_level_exceeded (__main__.WorksInteractionsProjectsTest.test_17_reply_level_exceeded) ... ok
+test_18_delete_comment (__main__.WorksInteractionsProjectsTest.test_18_delete_comment) ... C:\Users\z1595\Desktop\yilia
+nmeng-main\app\routes\interactions.py:170: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x 
+series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated si
+nce: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  comment = Comment.query.get(comment_id)
+ok
+test_19_unlike_work (__main__.WorksInteractionsProjectsTest.test_19_unlike_work) ... ok
+test_20_create_project (__main__.WorksInteractionsProjectsTest.test_20_create_project) ... C:\Users\z1595\Desktop\yilia
+nmeng-main\app\routes\projects.py:68: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x serie
+s of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 
+2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  creator = User.query.get(project.user_id)
+ok
+test_21_list_projects (__main__.WorksInteractionsProjectsTest.test_21_list_projects) ... ok
+test_22_get_project_detail (__main__.WorksInteractionsProjectsTest.test_22_get_project_detail) ... ok
+test_23_update_project (__main__.WorksInteractionsProjectsTest.test_23_update_project) ... ok
+test_24_apply_project (__main__.WorksInteractionsProjectsTest.test_24_apply_project) ... C:\Users\z1595\Desktop\yilianm
+eng-main\app\routes\projects.py:314: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series
+ of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2
+.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  applicant = User.query.get(request.user.id)
+ok
+test_25_apply_again_rejected (__main__.WorksInteractionsProjectsTest.test_25_apply_again_rejected) ... ok
+test_26_approve_application (__main__.WorksInteractionsProjectsTest.test_26_approve_application) ... C:\Users\z1595\Des
+ktop\yilianmeng-main\app\routes\projects.py:335: DeprecationWarning: datetime.datetime.utcnow() is deprecated and sched
+uled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(d
+atetime.UTC).
+  application.processed_at = datetime.utcnow()
+C:\Users\z1595\Desktop\yilianmeng-main\app\routes\projects.py:344: LegacyAPIWarning: The Query.get() method is consider
+ed legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Sess
+ion.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  applicant = User.query.get(application.user_id)
+ok
+test_27_my_projects (__main__.WorksInteractionsProjectsTest.test_27_my_projects) ... C:\Users\z1595\Desktop\yilianmeng-
+main\app\routes\projects.py:403: SAWarning: Coercing Subquery object into a select() for use in IN(); please pass a sel
+ect() construct explicitly
+  db.or_(Project.user_id == request.user.id, Project.id.in_(joined_ids))
+ok
+test_28_my_joined_projects (__main__.WorksInteractionsProjectsTest.test_28_my_joined_projects) ... C:\Users\z1595\Deskt
+op\yilianmeng-main\app\routes\projects.py:395: SAWarning: Coercing Subquery object into a select() for use in IN(); ple
+ase pass a select() construct explicitly
+  query = Project.query.filter(Project.id.in_(joined_ids))
+ok
+test_29_close_project (__main__.WorksInteractionsProjectsTest.test_29_close_project) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.547s
+
+OK
+[OK] 1 创建草稿 work_id=33
+[OK] 2 编辑作品
+[OK] 3 发布作品
+[OK] 4 作品详情
+[OK] 5 我的作品 total=1
+[OK] 6 推流 total=18
+[OK] 7 搜索作品
+[OK] 8 按技能筛选
+[OK] 9 删除作品
+[OK] 10 点赞 like_count=1
+[OK] 11 重复点赞被拒
+[OK] 12 点赞列表 total=1
+[OK] 13 评论 comment_id=17
+[OK] 14 回复评论
+[OK] 15 评论列表 total=1
+[OK] 16 回复列表 total=1
+[OK] 17 三级回复被拒
+[OK] 18 删除评论
+[OK] 19 取消点赞 like_count=0
+[OK] 20 创建项目 project_id=12
+[OK] 21 项目列表 total=6
+[OK] 22 项目详情
+[OK] 23 编辑项目
+[OK] 24 申请加入 app_id=10
+[OK] 25 重复申请被拒
+[OK] 26 通过申请
+[OK] 27 我的项目 total=1
+[OK] 28 我参与的项目 total=1
+[OK] 29 关闭项目

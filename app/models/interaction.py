@@ -41,6 +41,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     work_id = db.Column(db.Integer, db.ForeignKey('works.id'), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('comments.id'), nullable=True, comment='回复的根评论ID，NULL为一级评论')
+    reply_to_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, comment='回复@的目标用户ID')
     content = db.Column(db.String(2000), nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, comment='软删除标记')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -52,6 +53,7 @@ class Comment(db.Model):
             'user_id': self.user_id,
             'work_id': self.work_id,
             'parent_id': self.parent_id,
+            'reply_to_user_id': self.reply_to_user_id,
             'content': '[已删除]' if self.is_deleted else self.content,
             'is_deleted': self.is_deleted,
             'created_at': self.created_at.isoformat() if self.created_at else None,
