@@ -36,12 +36,15 @@ class User(db.Model):
             return False
         return check_password_hash(self.password_hash, password)
 
-    def to_dict(self):
+    def to_dict(self, show_full_phone=False):
+        phone_display = self.phone if show_full_phone else (
+            self.phone[:3] + '****' + self.phone[-4:] if len(self.phone) >= 7 else self.phone
+        )
         return {
             'user_id': self.id,
             'nickname': self.nickname,
             'avatar': self.avatar,
-            'phone': self.phone[:3] + '****' + self.phone[-4:] if len(self.phone) >= 7 else self.phone,
+            'phone': phone_display,
             'level': self.level,
             'exp': self.exp,
             'bio': self.bio,

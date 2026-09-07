@@ -14,6 +14,10 @@ class Project(db.Model):
     deadline = db.Column(db.DateTime)
     max_members = db.Column(db.Integer, default=10, comment='招募总人数上限')
     cover_url = db.Column(db.String(255), default='', comment='项目封面')
+    topic = db.Column(db.String(100), default='', comment='项目主题')
+    required_level = db.Column(db.Integer, default=1, comment='要求账号最低等级')
+    required_project_count = db.Column(db.Integer, default=0, comment='要求参与项目次数下限')
+    contact_visible = db.Column(db.Boolean, default=True, comment='队长是否公开联系方式')
     status = db.Column(db.String(20), default='recruiting')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -35,6 +39,10 @@ class Project(db.Model):
             'deadline': self.deadline.isoformat() if self.deadline else None,
             'max_members': self.max_members,
             'cover_url': self.cover_url,
+            'topic': self.topic,
+            'required_level': self.required_level,
+            'required_project_count': self.required_project_count,
+            'contact_visible': self.contact_visible,
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
@@ -53,8 +61,8 @@ class ProjectApplication(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     processed_at = db.Column(db.DateTime, comment='审批时间')
     
-    def to_dict(self):
-        return {
+    def to_dict(self, with_expired=False):
+        d = {
             'id': self.id,
             'project_id': self.project_id,
             'user_id': self.user_id,
@@ -63,6 +71,15 @@ class ProjectApplication(db.Model):
             'created_at': self.created_at.isoformat(),
             'processed_at': self.processed_at.isoformat() if self.processed_at else None
         }
+        if with_expired:
+            # 动态判断过期：pending + 项目截止时间已过
+            project = Project.query.get(self.project_id)
+            from datetime import datetime
+            d['is_expired'] = (self.status == 'pending' and project
+                               and project.deadline and project.deadline < datetime.utcnow())
+            if d['is_expired']:
+                d['status'] = 'expired'
+        return d
 
 class ProjectRequiredSkill(db.Model):
     """项目所需技能表：替代 projects.required_skills JSON 字段，

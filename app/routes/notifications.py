@@ -2,7 +2,7 @@
 """通知模块路由：官方/互动/待办通知"""
 from flask import Blueprint, request
 from app import db
-from app.models import Notification, User, Conversation, ConversationRead
+from app.models import Notification, User, Conversation, ConversationRead, Work
 from app.utils.helpers import login_required, success_response, error_response, get_pagination_params
 
 bp = Blueprint('notifications', __name__)
@@ -66,9 +66,23 @@ def list_interaction():
     sender_ids = list({n.sender_id for n in items if n.sender_id})
     senders = {u.id: u for u in User.query.filter(User.id.in_(sender_ids)).all()} if sender_ids else {}
 
+    # 批量查被操作作品（related_type=work）
+    work_ids = list({n.related_id for n in items if n.related_type == 'work'})
+    works = {w.id: w for w in Work.query.filter(Work.id.in_(work_ids)).all()} if work_ids else {}
+
     list_data = []
     for n in items:
         sender = senders.get(n.sender_id) if n.sender_id else None
+        # 被操作对象摘要
+        related_work = None
+        if n.related_type == 'work' and n.related_id in works:
+            w = works[n.related_id]
+            related_work = {
+                'work_id': w.id,
+                'title': w.title,
+                'cover_url': w.cover_url,
+                'files': (w.files or [])[:1]
+            }
         list_data.append({
             'notification_id': n.id,
             'subtype': n.subtype,
@@ -81,6 +95,7 @@ def list_interaction():
             } if sender else None,
             'related_type': n.related_type,
             'related_id': n.related_id,
+            'related_work': related_work,
             'is_read': n.is_read,
             'created_at': n.created_at.isoformat() if n.created_at else None
         })

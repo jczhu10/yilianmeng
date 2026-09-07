@@ -7,11 +7,12 @@ from app.models import (
     StyleTag, ProfileStyleTag,
     WorkExperience, WorkExperienceImage,
     EducationExperience,
-    AbilityProof, AbilityProofFile
+    AbilityProof, AbilityProofFile,
+    User, Follow, Work, Project, WorkViewHistory, ProjectViewHistory
 )
 from app.utils.helpers import (
     login_required, success_response, error_response,
-    save_file, allowed_file
+    save_file, allowed_file, format_pagination, get_pagination_params
 )
 
 bp = Blueprint('profile', __name__)
@@ -101,6 +102,109 @@ def get_user_profile(user_id):
     if not profile:
         return error_response(ErrorCode.NOT_FOUND, '该用户尚未创建档案', http_code=404)
     return success_response(data=profile.to_dict(with_relations=True))
+
+
+# ==================== 个人主页聚合 + 浏览记录（3个）====================
+
+# 个人主页聚合接口（一次性返回头像/昵称/手机/技能/计数/关注关系）
+@bp.route('/homepage/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_homepage(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return error_response(ErrorCode.NOT_FOUND, '用户不存在', http_code=404)
+
+    is_self = (request.user.id == user_id)
+    profile = Profile.query.filter_by(user_id=user_id).first()
+    profile_data = None
+    if profile:
+        pd = profile.to_dict(with_relations=True)
+        profile_data = {
+            'identity': pd.get('identity'),
+            'skills': pd.get('skills', []),
+            'style_tags': pd.get('style_tags', []),
+        }
+
+    # 关注关系
+    is_following = Follow.query.filter_by(follower_id=request.user.id, followed_id=user_id).first() is not None
+    is_followed_by = Follow.query.filter_by(follower_id=user_id, followed_id=request.user.id).first() is not None
+
+    data = {
+        'user': user.to_dict(show_full_phone=is_self),
+        'profile': profile_data,
+        'is_following': is_following,
+        'is_followed_by': is_followed_by,
+        'is_mutual': is_following and is_followed_by,
+        'is_self': is_self,
+    }
+    return success_response(data=data)
+
+
+# 我浏览过的作品
+@bp.route('/views/works', methods=['GET'])
+@login_required
+def get_my_viewed_works():
+    page, page_size = get_pagination_params()
+    query = WorkViewHistory.query.filter_by(user_id=request.user.id) \
+        .order_by(WorkViewHistory.last_viewed_at.desc())
+    result = format_pagination(query, page, page_size)
+
+    work_ids = [h.work_id for h in result['list']]
+    works = {w.id: w for w in Work.query.filter(Work.id.in_(work_ids)).all()} if work_ids else {}
+    author_ids = list({h.author_id for h in result['list']})
+    authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+
+    list_data = []
+    for h in result['list']:
+        w = works.get(h.work_id)
+        list_data.append({
+            'work_id': h.work_id,
+            'title': w.title if w else None,
+            'cover_url': (w.cover_url if w else None),
+            'files': (w.files or [])[:1] if w else [],
+            'author': {
+                'user_id': h.author_id,
+                'nickname': authors.get(h.author_id).nickname if authors.get(h.author_id) else None,
+                'avatar': authors.get(h.author_id).avatar if authors.get(h.author_id) else None,
+            } if h.author_id else None,
+            'view_count': h.view_count,
+            'last_viewed_at': h.last_viewed_at.isoformat() if h.last_viewed_at else None,
+        })
+    result['list'] = list_data
+    return success_response(data=result)
+
+
+# 我浏览过的项目
+@bp.route('/views/projects', methods=['GET'])
+@login_required
+def get_my_viewed_projects():
+    page, page_size = get_pagination_params()
+    query = ProjectViewHistory.query.filter_by(user_id=request.user.id) \
+        .order_by(ProjectViewHistory.last_viewed_at.desc())
+    result = format_pagination(query, page, page_size)
+
+    project_ids = [h.project_id for h in result['list']]
+    projects = {p.id: p for p in Project.query.filter(Project.id.in_(project_ids)).all()} if project_ids else {}
+    author_ids = list({h.author_id for h in result['list']})
+    authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()} if author_ids else {}
+
+    list_data = []
+    for h in result['list']:
+        proj = projects.get(h.project_id)
+        list_data.append({
+            'project_id': h.project_id,
+            'title': proj.title if proj else None,
+            'cover_url': (proj.cover_url if proj else None),
+            'author': {
+                'user_id': h.author_id,
+                'nickname': authors.get(h.author_id).nickname if authors.get(h.author_id) else None,
+                'avatar': authors.get(h.author_id).avatar if authors.get(h.author_id) else None,
+            } if h.author_id else None,
+            'view_count': h.view_count,
+            'last_viewed_at': h.last_viewed_at.isoformat() if h.last_viewed_at else None,
+        })
+    result['list'] = list_data
+    return success_response(data=result)
 
 
 # ==================== 技能（4个）====================

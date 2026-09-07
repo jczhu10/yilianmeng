@@ -1,8 +1,9 @@
 import logging
+from datetime import datetime
 from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import Work, User, Skill, Follow, WorkVisibilityRule, WorkRepost, Project
+from app.models import Work, User, Skill, Follow, WorkVisibilityRule, WorkRepost, Project, WorkViewHistory, Like
 from app.utils.helpers import (
     login_required, success_response, error_response,
     get_pagination_params, format_pagination,
@@ -483,9 +484,15 @@ def get_work_detail(work_id):
         return err
 
     author = User.query.get(work.user_id)
-    # 浏览数+1（仅published，且非作者本人）
+    # 浏览数+1 + 写浏览记录（仅published，且非作者本人）
     if work.status == 'published' and work.user_id != request.user.id:
         work.view_count = (work.view_count or 0) + 1
+        existing = WorkViewHistory.query.filter_by(user_id=request.user.id, work_id=work.id).first()
+        if existing:
+            existing.view_count = (existing.view_count or 0) + 1
+            existing.last_viewed_at = datetime.utcnow()
+        else:
+            db.session.add(WorkViewHistory(user_id=request.user.id, work_id=work.id, author_id=work.user_id))
         db.session.commit()
 
     resp = work.to_dict(with_author=True, author=author)
@@ -538,6 +545,32 @@ def get_my_works():
     )
     result = format_pagination(query, page, page_size)
     result['list'] = [w.to_dict() for w in result['list']]
+    return success_response(data=result)
+
+
+# 6.1 获取指定用户的作品列表（带可见性过滤）
+@bp.route('/user/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_works(user_id):
+    page, page_size = get_pagination_params()
+    query = visible_works_query(request.user.id).filter(Work.user_id == user_id)
+    query = query.order_by(Work.published_at.desc())
+    result = format_pagination(query, page, page_size)
+    result['list'] = [w.to_dict(with_author=True) for w in result['list']]
+    return success_response(data=result)
+
+
+# 6.2 获取指定用户点赞过的作品
+@bp.route('/user/<int:user_id>/liked', methods=['GET'])
+@login_required
+def get_user_liked_works(user_id):
+    page, page_size = get_pagination_params()
+    from sqlalchemy import desc as sql_desc
+    query = Work.query.join(Like, Like.work_id == Work.id) \
+        .filter(Like.user_id == user_id, Work.status == 'published', Work.status != 'deleted') \
+        .order_by(sql_desc(Like.created_at))
+    result = format_pagination(query, page, page_size)
+    result['list'] = [w.to_dict(with_author=True) for w in result['list']]
     return success_response(data=result)
 
 

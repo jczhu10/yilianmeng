@@ -1,7 +1,7 @@
 import logging
 from flask import Blueprint, request
 from app import db
-from app.models import Work, User, Like, Comment
+from app.models import Work, User, Like, Comment, Notification
 from app.utils.helpers import (
     login_required, success_response, error_response,
     get_pagination_params, format_pagination
@@ -47,6 +47,20 @@ def like_work(work_id):
     like = Like(user_id=request.user.id, work_id=work_id)
     db.session.add(like)
     work.like_count = (work.like_count or 0) + 1
+
+    # 给作品作者发互动通知（自己赞自己不发）
+    if work.user_id != request.user.id:
+        db.session.add(Notification(
+            user_id=work.user_id,
+            type='interaction',
+            subtype='like',
+            title='新的点赞',
+            content=f'{request.user.nickname} 赞了你的作品',
+            sender_id=request.user.id,
+            related_type='work',
+            related_id=work.id
+        ))
+
     db.session.commit()
     logger.info(f'点赞: user_id={request.user.id}, work_id={work_id}')
 
@@ -127,6 +141,36 @@ def create_comment(work_id):
         content=content
     )
     db.session.add(comment)
+
+    # 一级评论 -> 通知作品作者
+    if parent_id is None and work.user_id != request.user.id:
+        db.session.add(Notification(
+            user_id=work.user_id,
+            type='interaction',
+            subtype='comment',
+            title='新的评论',
+            content=f'{request.user.nickname} 评论了你的作品',
+            sender_id=request.user.id,
+            related_type='work',
+            related_id=work.id
+        ))
+
+    # 回复评论 -> 通知被回复者（与作者不同时才发，避免重复）
+    if parent_id is not None:
+        replied = Comment.query.get(parent_id)
+        if (replied and replied.user_id != request.user.id
+                and replied.user_id != work.user_id):
+            db.session.add(Notification(
+                user_id=replied.user_id,
+                type='interaction',
+                subtype='comment',
+                title='新的回复',
+                content=f'{request.user.nickname} 回复了你的评论',
+                sender_id=request.user.id,
+                related_type='work',
+                related_id=work.id
+            ))
+
     db.session.commit()
     logger.info(f'评论: comment_id={comment.id}, user_id={request.user.id}, work_id={work_id}, parent_id={parent_id}')
 
