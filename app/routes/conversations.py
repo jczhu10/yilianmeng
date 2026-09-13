@@ -2,14 +2,14 @@
 """私聊会话路由：联系人列表/获取会话/消息记录/发消息/已读/官方会话"""
 from flask import Blueprint, request
 from app import db
-from app.models import (Conversation, ConversationRead, Message, User, Follow)
+from app.models import (Conversation, ConversationRead, Message, User, Follow, Project)
 from app.utils.helpers import (login_required, success_response, error_response,
                                get_pagination_params)
 from datetime import datetime
 
 bp = Blueprint('conversations', __name__)
 
-ALLOWED_MSG_TYPES = {'text', 'image', 'voice', 'file'}
+ALLOWED_MSG_TYPES = {'text', 'image', 'voice', 'file', 'project_invite'}
 
 
 def _get_or_create_conversation(user1_id, user2_id):
@@ -194,6 +194,13 @@ def send_message(conversation_id):
         return error_response(400, 'file 类型必须传 file_name')
     if msg_type == 'voice' and data.get('voice_duration') is None:
         return error_response(400, 'voice 类型必须传 voice_duration')
+    if msg_type == 'project_invite':
+        pid = data.get('project_id')
+        if not pid:
+            return error_response(400, 'project_invite 必须传 project_id')
+        proj = Project.query.get(pid)
+        if not proj:
+            return error_response(5001, '项目不存在', http_code=404)
 
     # 关注关系校验
     receiver_id = conv.user2_id if conv.user1_id == my_id else conv.user1_id
@@ -201,6 +208,8 @@ def send_message(conversation_id):
     if not can_send:
         return error_response(err_code, err_msg)
 
+    if msg_type == 'project_invite':
+        content = str(data.get('project_id'))
     msg = Message(
         conversation_type='private',
         conversation_id=conversation_id,
@@ -215,7 +224,7 @@ def send_message(conversation_id):
     db.session.flush()
 
     # 更新会话冗余字段
-    preview = content if msg_type == 'text' else f'[{msg_type}]'
+    preview = content if msg_type == 'text' else ('[项目邀请]' if msg_type == 'project_invite' else f'[{msg_type}]')
     conv.last_message_content = preview
     conv.last_message_at = msg.created_at
 
@@ -228,12 +237,21 @@ def send_message(conversation_id):
 
     db.session.commit()
 
-    return success_response(data={
+    ret = {
         'message_id': msg.id,
         'msg_type': msg.msg_type,
         'content': msg.content,
         'created_at': msg.created_at.isoformat() if msg.created_at else None
-    }, message='发送成功')
+    }
+    if msg_type == 'project_invite':
+        proj = Project.query.get(data.get('project_id'))
+        ret['project'] = {
+            'project_id': proj.id,
+            'title': proj.title,
+            'cover_url': proj.cover_url,
+            'status': proj.status
+        } if proj else None
+    return success_response(data=ret, message='发送成功')
 
 
 # ========== 接口16：标记会话已读 ==========

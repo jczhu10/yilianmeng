@@ -46,7 +46,7 @@
 
 ## 项目状态
 
-**后端 MVP 全量交付** · 11 个模块 90 个接口全部开发完成 · 等待前端联调对接。
+**后端 MVP 全量交付** · 11 个模块 96 个接口全部开发完成 · 等待前端联调对接。
 
 ### 开发进度
 
@@ -110,11 +110,11 @@ yilianmeng-main/
 │   │   ├── work_top.py           # 作品置顶
 │   │   ├── work_view_history.py    # 作品浏览历史
 │   │   └── project_view_history.py # 项目浏览历史
-│   ├── routes/                   # API 路由（11 个模块，90 个接口）
+│   ├── routes/                   # API 路由（11 个模块，96 个接口）
 │   │   ├── __init__.py
 │   │   ├── auth.py               # 认证（7）
-│   │   ├── profile.py            # 档案 + 主页（23）
-│   │   ├── works.py              # 作品 + 广场（12）
+│   │   ├── profile.py            # 档案 + 主页（26）
+│   │   ├── works.py              # 作品 + 广场（14）
 │   │   ├── interactions.py       # 互动（7）
 │   │   ├── projects.py           # 协作项目（16）
 │   │   ├── conversations.py      # 私信会话（6）
@@ -133,6 +133,8 @@ yilianmeng-main/
 ├── venv/                         # Python 虚拟环境
 ├── app.py                        # 应用入口
 ├── seed_skills.py                # 技能数据初始化脚本
+├── API.md                        # 接口文档（96 个，最新）
+├── DATABASE.md                   # 数据库文档（37 张表，最新）
 ├── requirements.txt              # 依赖清单
 ├── .env                          # 环境变量
 ├── .env.example                  # 环境变量示例
@@ -182,7 +184,7 @@ yilianmeng-main/
 | 活动 | `event_participants` | 活动参与者 |
 | 关注 | `follows` | 关注关系（唯一约束 follower_id+followed_id） |
 
-> 完整字段/索引/外键明细见 [work-logs/2026-09-07_full-api-and-db.md](work-logs/2026-09-07_full-api-and-db.md)。
+> 完整字段/索引/外键明细见 [API.md](API.md) / [DATABASE.md](DATABASE.md)（全量最新）。
 
 ## API 接口规范
 
@@ -205,7 +207,7 @@ yilianmeng-main/
 
 > HTTP 状态码与业务码分离：HTTP 遵循语义（200/400/401/403/404/429/500），Body.code 为业务码（200=成功，1xxx=认证，3xxx=作品，5xxx=项目）。
 
-### 已实现接口（90 个，按模块分组）
+### 已实现接口（96 个，按模块分组）
 
 | 模块 | 接口数 | 路径前缀 | 主要功能 |
 |------|--------|----------|----------|
@@ -220,7 +222,7 @@ yilianmeng-main/
 | 通知 | 5 | `/notifications` | 未读计数/互动通知/待办通知/标记已读/全部已读 |
 | 关注 | 6 | `/users/<id>/follow` `/following` `/followers` | 关注/取关/状态/我的关注/我的粉丝/统计 |
 
-> 完整接口清单（含路径/方法/函数定位/文件）见 [work-logs/2026-09-07_full-api-and-db.md](work-logs/2026-09-07_full-api-and-db.md)。
+> 完整接口清单（含路径/方法/函数定位/文件）见 [API.md](API.md) / [DATABASE.md](DATABASE.md)（全量最新）。
 
 ### 错误码一览
 

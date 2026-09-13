@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from flask import Blueprint, request
 from app import db
-from app.models import Project, ProjectApplication, User, Skill, Notification, ProjectViewHistory, Rating, RatingTag
+from app.models import Project, ProjectApplication, User, Skill, Notification, ProjectViewHistory, Rating, RatingTag, Profile, ProfileSkill
 from app.utils.helpers import (
     login_required, success_response, error_response,
     get_pagination_params, format_pagination
@@ -81,17 +81,41 @@ def get_project_or_404(project_id, include_closed=False):
 
 
 def build_project_item(project, current_user_id=None, with_applications=False, with_members=False):
-    """构造项目对象，附加发起人/成员数/申请列表"""
+    """构造项目对象，附加发起人/成员数/申请列表/成员头像/队长技能/队长参与项目数"""
     item = project.to_dict()
     # 发起人信息
     creator = User.query.get(project.user_id)
-    item['creator'] = creator.to_dict() if creator else None
+    if creator:
+        creator_dict = creator.to_dict()
+        # 队长技能列表
+        profile = Profile.query.filter_by(user_id=creator.id).first()
+        if profile:
+            pss = ProfileSkill.query.filter_by(profile_id=profile.id).all()
+            creator_dict['skills'] = [ps.skill.to_dict() for ps in pss if ps.skill]
+        else:
+            creator_dict['skills'] = []
+        # 队长参与项目次数（作为 approved 成员的项目数）
+        joined_count = ProjectApplication.query.filter_by(
+            user_id=creator.id, status='approved'
+        ).count()
+        creator_dict['joined_project_count'] = joined_count
+        item['creator'] = creator_dict
+    else:
+        item['creator'] = None
     item['is_creator'] = (current_user_id == project.user_id)
     # 成员数 = 已通过申请数 + 1(发起人)
-    member_count = ProjectApplication.query.filter_by(
+    approved_apps = ProjectApplication.query.filter_by(
         project_id=project.id, status='approved'
-    ).count()
+    ).all()
+    member_count = len(approved_apps)
     item['member_count'] = member_count + 1
+    # 已招募队友头像（前 5 个，含发起人）
+    member_ids = [project.user_id] + [a.user_id for a in approved_apps[:4]]
+    member_users = {u.id: u for u in User.query.filter(User.id.in_(member_ids)).all()} if member_ids else {}
+    item['member_avatars'] = [
+        {'user_id': uid, 'avatar': member_users[uid].avatar, 'nickname': member_users[uid].nickname}
+        for uid in member_ids if uid in member_users
+    ]
     # 当前用户是否已申请
     if current_user_id is not None:
         app = ProjectApplication.query.filter_by(
@@ -112,9 +136,6 @@ def build_project_item(project, current_user_id=None, with_applications=False, w
         item['applications'] = None
     # 成员列表
     if with_members:
-        approved_apps = ProjectApplication.query.filter_by(
-            project_id=project.id, status='approved'
-        ).all()
         member_ids = [project.user_id] + [a.user_id for a in approved_apps]
         members = {u.id: u for u in User.query.filter(User.id.in_(member_ids)).all()} if member_ids else {}
         item['members'] = [members.get(uid).to_dict() for uid in member_ids if members.get(uid)]

@@ -2,13 +2,13 @@
 """群聊路由：群列表/消息记录/发消息/已读/成员/建群/邀请/退出"""
 from flask import Blueprint, request
 from app import db
-from app.models import (Group, GroupMember, GroupRead, Message, User)
+from app.models import (Group, GroupMember, GroupRead, Message, User, Project)
 from app.utils.helpers import (login_required, success_response, error_response,
                                get_pagination_params)
 
 bp = Blueprint('groups', __name__)
 
-ALLOWED_MSG_TYPES = {'text', 'image', 'voice', 'file'}
+ALLOWED_MSG_TYPES = {'text', 'image', 'voice', 'file', 'rating_request'}
 
 
 def _check_member(group_id, user_id):
@@ -111,7 +111,16 @@ def send_group_message(group_id):
         return error_response(400, 'file 类型必须传 file_name')
     if msg_type == 'voice' and data.get('voice_duration') is None:
         return error_response(400, 'voice 类型必须传 voice_duration')
+    if msg_type == 'rating_request':
+        pid = data.get('project_id')
+        if not pid:
+            return error_response(400, 'rating_request 必须传 project_id')
+        proj = Project.query.get(pid)
+        if not proj:
+            return error_response(5001, '项目不存在', http_code=404)
 
+    if msg_type == 'rating_request':
+        content = str(data.get('project_id'))
     msg = Message(
         conversation_type='group',
         group_id=group_id,
@@ -126,7 +135,7 @@ def send_group_message(group_id):
     db.session.flush()
 
     # 更新群冗余字段
-    preview = content if msg_type == 'text' else f'[{msg_type}]'
+    preview = content if msg_type == 'text' else ('[互评请求]' if msg_type == 'rating_request' else f'[{msg_type}]')
     grp = Group.query.get(group_id)
     grp.last_message_content = preview
     grp.last_message_at = msg.created_at
@@ -142,12 +151,21 @@ def send_group_message(group_id):
 
     db.session.commit()
 
-    return success_response(data={
+    ret = {
         'message_id': msg.id,
         'msg_type': msg.msg_type,
         'content': msg.content,
         'created_at': msg.created_at.isoformat() if msg.created_at else None
-    }, message='发送成功')
+    }
+    if msg_type == 'rating_request':
+        proj = Project.query.get(data.get('project_id'))
+        ret['project'] = {
+            'project_id': proj.id,
+            'title': proj.title,
+            'cover_url': proj.cover_url,
+            'status': proj.status
+        } if proj else None
+    return success_response(data=ret, message='发送成功')
 
 
 # ========== 接口20：标记群聊已读 ==========
