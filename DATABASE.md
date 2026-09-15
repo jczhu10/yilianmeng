@@ -1104,7 +1104,7 @@
 | `project_applications.status` | `pending` / `approved` / `rejected` / `left` / `removed` | 待审/通过/拒绝/主动退出/被踢 |
 | `notifications.type` | `official` / `interaction` / `todo` | 官方/互动/待办 |
 | `transactions.type` | `recharge` / `withdraw` / `transfer` / `reward` / `earn` | 充值/提现/转账/打赏/收益 |
-| `messages.msg_type` | `text` / `file` / `voice` | 文本/文件/语音 |
+| `messages.msg_type` | `text` / `image` / `file` / `voice` / `project_invite` / `rating_request` | 文本/图片/文件/语音/项目邀请/互评请求 |
 | `messages.conversation_type` | `private` / `group` | 私信/群聊 |
 | `profiles.identity_type` | `professional` / `amateur` | 专业/非专业 |
 

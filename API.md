@@ -1,6 +1,6 @@
 # 艺联萌后端接口文档（API.md）
 
-> 最后更新：2026-09-13 · 从代码自动提取 · 共 **96** 个接口
+> 最后更新：2026-09-13（含项目增强+消息类型扩展） · 从代码自动提取 · 共 **96** 个接口
 
 ## 一、基础信息
 
@@ -846,6 +846,14 @@ HTTP 状态码与业务码分离：HTTP 遵循语义（200/400/401/403/404/429/5
 **响应数据**
 - 构造函数 `build_project_item`（在路由文件中查看详情）
 
+> `build_project_item` 返回的 `data` 包含以下增强字段：
+>
+> | 字段 | 类型 | 说明 |
+> |------|------|------|
+> | `member_avatars` | array | 已招募成员头像列表（最多 5 个，含发起人），每项 `{user_id, avatar, nickname}` |
+> | `creator.skills` | array | 队长技能列表，每项为 Skill 对象 `{id, category_id, name, sort_order}` |
+> | `creator.joined_project_count` | int | 队长作为已通过成员参与的项目数 |
+
 ---
 
 ### 58. `PUT /api/v1/projects/<int:project_id>`
@@ -1024,13 +1032,20 @@ HTTP 状态码与业务码分离：HTTP 遵循语义（200/400/401/403/404/429/5
 
 | 位置 | 参数 | 说明 |
 |------|------|------|
-| body | `content` | JSON 字段 |
-| body | `file_name` | JSON 字段 |
-| body | `file_size` | JSON 字段 |
-| body | `msg_type` | JSON 字段 |
-| body | `voice_duration` | JSON 字段 |
+| body | `content` | JSON 字段（`project_invite` 类型时传任意非空值，实际 project_id 从 `project_id` 字段取） |
+| body | `file_name` | JSON 字段（`file` 类型必填） |
+| body | `file_size` | JSON 字段（`file` 类型必填） |
+| body | `msg_type` | JSON 字段，枚举：`text` / `image` / `file` / `voice` / `project_invite` |
+| body | `project_id` | JSON 字段（`project_invite` 类型必填，校验项目存在性） |
+| body | `voice_duration` | JSON 字段（`voice` 类型必填） |
 
-**响应数据**：`{ code, message, data }`（data 通常为 null 或简单值）
+**响应数据**
+- `msg_type='project_invite'` 时，`data` 额外返回：
+  - `message_id`: int
+  - `msg_type`: 'project_invite'
+  - `content`: str（存储 project_id 字符串）
+  - `project`: `{ project_id, title, cover_url, status }`
+  - `created_at`: ISO 时间
 
 ---
 
@@ -1134,13 +1149,20 @@ HTTP 状态码与业务码分离：HTTP 遵循语义（200/400/401/403/404/429/5
 
 | 位置 | 参数 | 说明 |
 |------|------|------|
-| body | `content` | JSON 字段 |
-| body | `file_name` | JSON 字段 |
-| body | `file_size` | JSON 字段 |
-| body | `msg_type` | JSON 字段 |
-| body | `voice_duration` | JSON 字段 |
+| body | `content` | JSON 字段（`rating_request` 类型时传任意非空值，实际 project_id 从 `project_id` 字段取） |
+| body | `file_name` | JSON 字段（`file` 类型必填） |
+| body | `file_size` | JSON 字段（`file` 类型必填） |
+| body | `msg_type` | JSON 字段，枚举：`text` / `image` / `file` / `voice` / `rating_request` |
+| body | `project_id` | JSON 字段（`rating_request` 类型必填，校验项目存在性） |
+| body | `voice_duration` | JSON 字段（`voice` 类型必填） |
 
-**响应数据**：`{ code, message, data }`（data 通常为 null 或简单值）
+**响应数据**
+- `msg_type='rating_request'` 时，`data` 额外返回：
+  - `message_id`: int
+  - `msg_type`: 'rating_request'
+  - `content`: str（存储 project_id 字符串）
+  - `project`: `{ project_id, title, cover_url, status }`
+  - `created_at`: ISO 时间
 
 ---
 
