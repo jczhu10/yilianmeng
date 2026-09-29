@@ -59,6 +59,10 @@ from app.routes.groups import bp as groups_bp
 app.register_blueprint(groups_bp, url_prefix='/api/v1/groups')
 from app.routes.messages_upload import bp as messages_upload_bp
 app.register_blueprint(messages_upload_bp, url_prefix='/api/v1/messages')
+from app.routes.events import bp as events_bp
+app.register_blueprint(events_bp, url_prefix='/api/v1/events')
+from app.routes.users import bp as users_bp
+app.register_blueprint(users_bp, url_prefix='/api/v1/users')
 
 @app.route('/')
 def hello():

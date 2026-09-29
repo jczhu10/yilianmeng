@@ -866,3 +866,18 @@ def repost_work(work_id):
     resp['source'] = {'type': 'work', 'source_user_id': src.user_id,
                        'data': src.to_dict(with_author=True, author=src_author)}
     return success_response(data=resp, message='转发成功')
+
+
+# ============================================================
+# 分享记录（share_count +1）
+# ============================================================
+@bp.route('/<int:work_id>/share', methods=['POST'])
+@login_required
+def share_work(work_id):
+    work = Work.query.filter_by(id=work_id).filter(Work.status != 'deleted').first()
+    if not work:
+        return error_response(ErrorCode.WORK_NOT_FOUND, '作品不存在', http_code=404)
+    work.share_count = (work.share_count or 0) + 1
+    db.session.commit()
+    logger.info(f'作品分享: work_id={work_id}, user_id={request.user.id}')
+    return success_response(data={'share_count': work.share_count}, message='分享成功')

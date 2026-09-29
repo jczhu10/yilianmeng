@@ -73,7 +73,7 @@ def get_my_profile():
     return success_response(data=profile.to_dict(with_relations=True))
 
 
-# 9. 更新档案基础信息
+# 9. 更新档案基础信息（identity）+ 个人主页基础信息（nickname/avatar/bio）
 @bp.route('/me', methods=['PUT'])
 @login_required
 def update_my_profile():
@@ -81,8 +81,29 @@ def update_my_profile():
     if not data:
         return error_response(ErrorCode.PARAM_ERROR, '请求参数不能为空', http_code=400)
 
-    profile = get_or_create_profile(request.user.id)
+    user = request.user
+    profile = get_or_create_profile(user.id)
 
+    # 个人主页基础信息（写在 users 表）
+    if 'nickname' in data:
+        nickname = (data['nickname'] or '').strip()
+        if not nickname:
+            return error_response(ErrorCode.PARAM_ERROR, 'nickname 不能为空字符串', http_code=400)
+        if len(nickname) > 50:
+            return error_response(ErrorCode.PARAM_ERROR, 'nickname 过长（上限 50 字符）', http_code=400)
+        user.nickname = nickname
+    if 'avatar' in data:
+        avatar = (data['avatar'] or '').strip()
+        if len(avatar) > 255:
+            return error_response(ErrorCode.PARAM_ERROR, 'avatar URL 过长（上限 255 字符）', http_code=400)
+        user.avatar = avatar
+    if 'bio' in data:
+        bio = (data['bio'] or '').strip()
+        if len(bio) > 500:
+            return error_response(ErrorCode.PARAM_ERROR, 'bio 过长（上限 500 字符）', http_code=400)
+        user.bio = bio
+
+    # 档案身份标识（写在 profiles 表）
     if 'identity' in data:
         identity = data['identity']
         if identity not in ALLOWED_IDENTITIES:
@@ -90,8 +111,11 @@ def update_my_profile():
         profile.identity = identity
 
     db.session.commit()
-    logger.info(f'档案更新: user_id={request.user.id}')
-    return success_response(data=profile.to_dict(), message='档案更新成功')
+    logger.info(f'档案/主页更新: user_id={user.id}')
+    return success_response(
+        data={'user': user.to_dict(), 'profile': profile.to_dict()},
+        message='更新成功'
+    )
 
 
 # 10. 查看他人档案
@@ -687,3 +711,34 @@ def upload_file():
     except Exception as e:
         logger.error(f'档案文件上传失败: {e}')
         return error_response(ErrorCode.PARAM_ERROR, '文件上传失败', http_code=500)
+
+
+# ==================== 评价标签字典 ====================
+
+# 评价标签列表
+@bp.route('/rating-tags', methods=['GET'])
+@login_required
+def list_rating_tags():
+    from app.models import RatingTag
+    tags = RatingTag.query.filter_by(is_active=True).order_by(RatingTag.sort_order.asc()).all()
+    return success_response(data=[t.to_dict() for t in tags])
+
+
+# ==================== 浏览记录删除 ====================
+
+# 删除/批量删除作品浏览记录
+@bp.route('/views/works', methods=['DELETE'])
+@login_required
+def delete_viewed_works():
+    data = request.get_json() or {}
+    work_ids = data.get('work_ids')
+    if not work_ids or not isinstance(work_ids, list):
+        return error_response(ErrorCode.PARAM_ERROR, 'work_ids 必须为非空数组', http_code=400)
+
+    deleted = WorkViewHistory.query.filter(
+        WorkViewHistory.user_id == request.user.id,
+        WorkViewHistory.work_id.in_(work_ids)
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    logger.info(f'删除浏览记录: user_id={request.user.id}, count={deleted}')
+    return success_response(data={'deleted_count': deleted}, message=f'已删除 {deleted} 条记录')

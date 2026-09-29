@@ -782,3 +782,91 @@ def list_ratings(project_id):
         items.append(d)
     result['list'] = items
     return success_response(data=result)
+
+
+# ============================================================
+# 16. 项目待审申请列表（仅发起人）
+# ============================================================
+@bp.route('/<int:project_id>/applications', methods=['GET'])
+@login_required
+def list_project_applications(project_id):
+    project, err = get_project_or_404(project_id)
+    if err:
+        return err
+    if project.user_id != request.user.id:
+        return error_response(ErrorCode.NO_PERMISSION, '无权查看，仅发起人可操作', http_code=403)
+
+    page, page_size = get_pagination_params()
+    status = request.args.get('status')
+    query = ProjectApplication.query.filter_by(project_id=project_id)
+    if status:
+        if status not in APP_QUERY_STATUSES:
+            return error_response(ErrorCode.PARAM_ERROR, 'status 参数不合法', http_code=400)
+        query = query.filter(ProjectApplication.status == status)
+    query = query.order_by(ProjectApplication.created_at.desc())
+    result = format_pagination(query, page, page_size)
+    applicant_ids = [a.user_id for a in result['list']]
+    applicants = {u.id: u for u in User.query.filter(User.id.in_(applicant_ids)).all()} if applicant_ids else {}
+    result['list'] = [build_application_item(a, applicants.get(a.user_id)) for a in result['list']]
+    return success_response(data=result)
+
+
+# ============================================================
+# 17. 项目成员列表
+# ============================================================
+@bp.route('/<int:project_id>/members', methods=['GET'])
+@login_required
+def list_project_members(project_id):
+    project, err = get_project_or_404(project_id)
+    if err:
+        return err
+    if not _is_project_member(project, request.user.id) and project.user_id != request.user.id:
+        return error_response(ErrorCode.NOT_A_MEMBER, '你不是该项目成员，无权查看', http_code=403)
+
+    approved_apps = ProjectApplication.query.filter_by(
+        project_id=project_id, status='approved'
+    ).order_by(ProjectApplication.created_at.asc()).all()
+    member_ids = [project.user_id] + [a.user_id for a in approved_apps]
+    members = {u.id: u for u in User.query.filter(User.id.in_(member_ids)).all()} if member_ids else {}
+    member_list = []
+    # 发起人在前
+    owner = members.get(project.user_id)
+    if owner:
+        member_list.append({
+            'user_id': owner.id,
+            'nickname': owner.nickname,
+            'avatar': owner.avatar,
+            'level': owner.level,
+            'role': 'owner',
+            'joined_at': project.created_at.isoformat() if project.created_at else None,
+        })
+    for a in approved_apps:
+        u = members.get(a.user_id)
+        if u:
+            member_list.append({
+                'user_id': u.id,
+                'nickname': u.nickname,
+                'avatar': u.avatar,
+                'level': u.level,
+                'role': 'member',
+                'joined_at': a.processed_at.isoformat() if a.processed_at else a.created_at.isoformat() if a.created_at else None,
+            })
+    return success_response(data={'list': member_list, 'total': len(member_list)})
+
+
+# ============================================================
+# 18. 项目关联作品列表
+# ============================================================
+@bp.route('/<int:project_id>/works', methods=['GET'])
+@login_required
+def list_project_works(project_id):
+    project, err = get_project_or_404(project_id)
+    if err:
+        return err
+    from app.models import Work
+    page, page_size = get_pagination_params()
+    query = Work.query.filter_by(project_id=project_id, status='published') \
+        .order_by(Work.published_at.desc())
+    result = format_pagination(query, page, page_size)
+    result['list'] = [w.to_dict() for w in result['list']]
+    return success_response(data=result)
