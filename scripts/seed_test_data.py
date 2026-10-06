@@ -25,12 +25,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import app, db
 from app.models import (
     User, Profile, SkillCategory, Skill, StyleTag, RatingTag,
-    Work, WorkRepost, WorkVisibilityRule, Follow,
+    Work, WorkRepost, WorkVisibilityRule, WorkTop, WorkViewHistory, EventParticipant, Follow,
     Project, ProjectApplication, ProjectRequiredSkill,
     Conversation, ConversationRead, Group, GroupMember, GroupRead,
     Notification, Like, Comment,
 )
 from app.utils.helpers import create_token
+from sqlalchemy import text
 
 # 固定测试账号（便于前端记忆）
 PHONE_A = '15500000001'
@@ -40,6 +41,7 @@ PASSWORD = 'Pass1234'
 
 def clean_old():
     """清理旧测试数据"""
+    db.session.execute(text('SET FOREIGN_KEY_CHECKS=0'))
     users = User.query.filter(User.phone.in_([PHONE_A, PHONE_B])).all()
     uids = [u.id for u in users]
     if not uids:
@@ -53,6 +55,9 @@ def clean_old():
     # 作品可见性规则
     wids = [w.id for w in Work.query.filter(Work.user_id.in_(uids)).all()]
     if wids:
+        WorkViewHistory.query.filter(WorkViewHistory.work_id.in_(wids)).delete(synchronize_session=False)
+        WorkTop.query.filter(WorkTop.work_id.in_(wids)).delete(synchronize_session=False)
+        EventParticipant.query.filter(EventParticipant.work_id.in_(wids)).delete(synchronize_session=False)
         WorkVisibilityRule.query.filter(WorkVisibilityRule.work_id.in_(wids)).delete(synchronize_session=False)
         WorkRepost.query.filter(WorkRepost.work_id.in_(wids)).delete(synchronize_session=False)
     # 作品
@@ -89,6 +94,7 @@ def clean_old():
     # 用户
     User.query.filter(User.id.in_(uids)).delete(synchronize_session=False)
     db.session.commit()
+    db.session.execute(text('SET FOREIGN_KEY_CHECKS=1'))
     print(f'已清理 {len(uids)} 个旧测试用户及其关联数据')
 
 
@@ -144,8 +150,8 @@ def main():
         ensure_dicts()
 
         # ---- 用户 ----
-        userA = make_user(PHONE_A, '艺小A', '学生', '美术学院大三，主修视觉传达', avatar='https://cdn.example.com/a.png')
-        userB = make_user(PHONE_B, '艺小B', '艺术相关工作者', '独立插画师，3 年商稿经验', avatar='https://cdn.example.com/b.png')
+        userA = make_user(PHONE_A, '艺小A', '学生', '美术学院大三，主修视觉传达', avatar='https://placehold.co/200x200/ECECEC/BDBDBD?text=A')
+        userB = make_user(PHONE_B, '艺小B', '艺术相关工作者', '独立插画师，3 年商稿经验', avatar='https://placehold.co/200x200/ECECEC/BDBDBD?text=B')
         db.session.flush()
 
         # 互关
@@ -163,14 +169,14 @@ def main():
                   published_at=datetime.datetime.utcnow())
         w2 = Work(user_id=userB.id, title='《城市切片》插画', description='城市光影系列第 3 张',
                   channel='visual', content_type='original', status='published',
-                  visibility_type='public', image_layout='grid', cover_url='https://cdn.example.com/w2.png',
-                  files='["https://cdn.example.com/w2_1.png","https://cdn.example.com/w2_2.png"]',
+                  visibility_type='public', image_layout='grid', cover_url='https://picsum.photos/seed/yilianmeng-w2/800/600',
+                  files='["https://picsum.photos/seed/yilianmeng-w2-1/800/600","https://picsum.photos/seed/yilianmeng-w2-2/800/600"]',
                   collaborators='[]', skill_tags='[]',
                   published_at=datetime.datetime.utcnow())
         w3 = Work(user_id=userA.id, title='《一段日常》Vlog', description='周末 vlog',
                   channel='video', content_type='original', status='published',
-                  visibility_type='followers', image_layout='flip', cover_url='https://cdn.example.com/w3.png',
-                  files='["https://cdn.example.com/w3.mp4"]',
+                  visibility_type='followers', image_layout='flip', cover_url='https://placehold.co/800x600/FF6B6B/FFFFFF?text=Vlog',
+                  files='["https://vjs.zencdn.net/v/oceans.mp4"]',
                   collaborators='[]', skill_tags='[]',
                   published_at=datetime.datetime.utcnow())
         db.session.add_all([w1, w2, w3])
@@ -199,7 +205,7 @@ def main():
 
         # ---- 群组 ----
         g = Group(name='艺联萌联调群', owner_id=userA.id,
-                  avatar='https://cdn.example.com/g.png')
+                  avatar='https://placehold.co/200x200/4A90E2/FFFFFF?text=%E8%89%BA%E8%81%94%E8%90%8C')
         db.session.add(g)
         db.session.flush()
         db.session.add(GroupMember(group_id=g.id, user_id=userA.id, role='owner', nickname='艺小A(队长)'))
@@ -211,7 +217,7 @@ def main():
         proj = Project(
             user_id=userA.id, title='校园文创周边设计招募', description='招 2 名插画师做校园文创',
             mode='paid', budget=2000, deadline=datetime.datetime(2026, 12, 31, 23, 59, 59),
-            max_members=3, cover_url='https://cdn.example.com/p.png', topic='设计',
+            max_members=3, cover_url='https://placehold.co/800x600/FF6B6B/FFFFFF?text=%E6%96%87%E5%88%9B%E6%8B%9B%E5%8B%9F', topic='设计',
             required_level=1, required_project_count=0, contact_visible=True,
             status='recruiting'
         )
